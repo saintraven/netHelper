@@ -27,15 +27,16 @@
 - `GET https://api.telegram.org/bot<TOKEN>/deleteWebhook`
 - Проверка: `GET .../getWebhookInfo` → `url` пустой.
 
-### 2. Community-нода polling
+### 2. Community-нода polling (уже на oleg_vm)
 
-**Settings → Community nodes → Install:**
+На **work** в volume `n8n-data`:
 
-`@mentoster/n8n-nodes-telegram-polling`
+- `N8N_CUSTOM_EXTENSIONS=/home/node/.n8n/custom`
+- пакет `@mentoster/n8n-nodes-telegram-polling@0.1.3`
 
-(альтернатива: `n8n-nodes-telegram-polling` / fork bergi9 — тот же принцип.)
+Workflow: `n8n/workflows/telegram-polling-nethelper.json`
 
-Перезапуск/обновление страницы UI при необходимости.
+Импорт + credential **Telegram Bot netHelper** (тот же token на все ноды).
 
 ### 3. Workflow
 

@@ -1,0 +1,58 @@
+{
+  "name": "netHelper · delete Telegram webhook (run once)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b1000001-0001-4001-8001-000000000001",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{ $credentials.accessToken }}/deleteWebhook"
+      },
+      "id": "b1000001-0001-4001-8001-000000000002",
+      "name": "deleteWebhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Telegram Bot netHelper"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{ $credentials.accessToken }}/getWebhookInfo"
+      },
+      "id": "b1000001-0001-4001-8001-000000000003",
+      "name": "getWebhookInfo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Telegram Bot netHelper"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual": {
+      "main": [[{ "node": "deleteWebhook", "type": "main", "index": 0 }]]
+    },
+    "deleteWebhook": {
+      "main": [[{ "node": "getWebhookInfo", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "netHelper" }]
+}
