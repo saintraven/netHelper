@@ -13,13 +13,7 @@
       "name": "Telegram long polling",
       "type": "@mentoster/n8n-nodes-telegram-polling.telegramPollingTrigger",
       "typeVersion": 1,
-      "position": [0, 300],
-      "credentials": {
-        "telegramApi": {
-          "id": "REPLACE_AFTER_IMPORT",
-          "name": "Telegram Bot netHelper"
-        }
-      }
+      "position": [0, 300]
     },
     {
       "parameters": {
@@ -115,13 +109,7 @@
       "name": "Reply check",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1340, 180],
-      "credentials": {
-        "telegramApi": {
-          "id": "REPLACE_AFTER_IMPORT",
-          "name": "Telegram Bot netHelper"
-        }
-      }
+      "position": [1340, 180]
     },
     {
       "parameters": {
@@ -133,13 +121,7 @@
       "name": "Reply start",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [820, 300],
-      "credentials": {
-        "telegramApi": {
-          "id": "REPLACE_AFTER_IMPORT",
-          "name": "Telegram Bot netHelper"
-        }
-      }
+      "position": [820, 300]
     },
     {
       "parameters": {
@@ -151,13 +133,7 @@
       "name": "Reply other",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [820, 440],
-      "credentials": {
-        "telegramApi": {
-          "id": "REPLACE_AFTER_IMPORT",
-          "name": "Telegram Bot netHelper"
-        }
-      }
+      "position": [820, 440]
     }
   ],
   "pinData": {},
