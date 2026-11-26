@@ -10,11 +10,13 @@
 
 1. Repo → **Settings → Deploy keys → Add deploy key**
 2. Title: `n8n@oleg_vm`
-3. Key: contents of `/home/node/.ssh/id_ed25519_nethelper.pub` on the container (read-only is enough for pull; enable write if n8n should push).
+3. Key: public key (persisted in volume `n8n-data`):
 
 ```bash
-ssh oleg_vm_work "podman exec -u node n8n cat /home/node/.ssh/id_ed25519_nethelper.pub"
+ssh oleg_vm_work "podman exec -u node n8n cat /home/node/.n8n/ssh/id_ed25519_nethelper.pub"
 ```
+
+Read-only deploy key is enough for pull; enable **Allow write access** if n8n should push workflows.
 
 4. After save, test:
 

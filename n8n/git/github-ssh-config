@@ -1,5 +1,5 @@
 Host github.com
   HostName github.com
   User git
-  IdentityFile /home/node/.ssh/id_ed25519_nethelper
+  IdentityFile /home/node/.n8n/ssh/id_ed25519_nethelper
   IdentitiesOnly yes
