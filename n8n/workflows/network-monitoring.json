@@ -1,0 +1,192 @@
+{
+  "name": "Network monitoring (hackathon MVP)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456001",
+      "name": "Manual trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.PROMETHEUS_URL || 'http://localhost:9090').replace(/\\/$/, '') + '/api/v1/query' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ \"probe_success{target_id=\\\"\" + ($env.TARGET_ID || 'edge-router-01') + \"\\\"}\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456002",
+      "name": "Query Prometheus",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const targetId = $env.TARGET_ID || 'edge-router-01';\nconst prom = $input.first().json;\nconst ok = prom?.status === 'success';\nconst rows = ok ? prom.data?.result || [] : [];\nconst row =\n  rows.find((r) => r.metric?.target_id === targetId) || rows[0] || null;\nconst metric = row?.metric || {};\n\nconst num = (v) => {\n  if (v === undefined || v === null) return null;\n  const n = Number(v);\n  return Number.isFinite(n) ? n : null;\n};\nconst probeSuccess = row?.value ? num(row.value[1]) : null;\n\nconst iso = (d) => d.toISOString().replace(/\\.\\d{3}Z$/, 'Z');\nconst now = new Date();\nconst missing = [];\nif (probeSuccess === null) missing.push('probe_success');\n\nconst dataStatus = !ok\n  ? 'unavailable'\n  : missing.length\n    ? 'partial'\n    : 'complete';\n\nconst event = {\n  schema_version: '1.0',\n  event_id: `evt-${Date.now()}`,\n  observed_at: iso(now),\n  window: {\n    from: iso(new Date(now.getTime() - 5 * 60 * 1000)),\n    to: iso(now),\n  },\n  target: {\n    target_id: metric.target_id || targetId,\n    instance: metric.instance || '',\n    environment: metric.environment || 'production',\n    job: metric.job || 'blackbox-http',\n    module: metric.module || 'http_2xx',\n  },\n  metrics: {\n    probe_success: { value: probeSuccess, unit: 'boolean' },\n    probe_duration_seconds: { value: null, unit: 'seconds' },\n    probe_http_status_code: { value: null, unit: 'code' },\n  },\n  data_quality: {\n    status: dataStatus,\n    missing_metrics: missing,\n    prometheus_status: prom?.status || 'error',\n  },\n};\n\nreturn [{ json: event }];"
+      },
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456003",
+      "name": "Normalize monitoring event v1.0",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.metrics.probe_success.value }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.data_quality.status }}",
+              "rightValue": "complete",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456004",
+      "name": "Needs analysis?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\\/$/, '') + '/chat/completions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-flash',\n  temperature: 0.2,\n  response_format: { type: 'json_object' },\n  messages: [\n    {\n      role: 'system',\n      content: 'You are a network monitoring analyst. Input is monitoring JSON schema 1.0. Distinguish real outages from missing or partial Prometheus data. Reply ONLY with JSON: status (ok|warning|critical|unknown), observation, possible_causes array, confidence 0-1, recommendations array. Use English.'\n    },\n    { role: 'user', content: JSON.stringify($json) }\n  ]\n} }}",
+        "options": {}
+      },
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456005",
+      "name": "DeepSeek analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst content = raw.choices?.[0]?.message?.content || '';\nlet analysis;\ntry {\n  analysis = JSON.parse(content);\n} catch (e) {\n  analysis = {\n    status: 'unknown',\n    observation: 'LLM response was not valid JSON',\n    possible_causes: [],\n    confidence: 0,\n    recommendations: ['Retry workflow', 'Check DeepSeek API key'],\n  };\n}\nconst event = $('Normalize monitoring event v1.0').first().json;\nreturn [{ json: { event, analysis } }];"
+      },
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456006",
+      "name": "Parse AI JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { event, analysis } = $input.first().json;\nconst lines = [\n  `Target: ${event.target.target_id}`,\n  `Observed: ${event.observed_at}`,\n  `Status: ${analysis.status}`,\n  '',\n  analysis.observation,\n  '',\n  'Possible causes:',\n  ...(analysis.possible_causes || []).map((c) => `- ${c}`),\n  '',\n  'Recommendations:',\n  ...(analysis.recommendations || []).map((r) => `- ${r}`),\n  '',\n  `Confidence: ${analysis.confidence}`,\n];\nreturn [{\n  json: {\n    subject: `[monitoring] ${event.target.target_id} — ${analysis.status}`,\n    body: lines.join('\\n'),\n    event,\n    analysis,\n  },\n}];"
+      },
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456007",
+      "name": "Format alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "message",
+              "value": "Target OK — no analysis needed",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "event",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "b8c1d2e3-4f5a-6789-abcd-ef0123456008",
+      "name": "OK branch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1040, 420]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual trigger": {
+      "main": [[{ "node": "Query Prometheus", "type": "main", "index": 0 }]]
+    },
+    "Query Prometheus": {
+      "main": [[{ "node": "Normalize monitoring event v1.0", "type": "main", "index": 0 }]]
+    },
+    "Normalize monitoring event v1.0": {
+      "main": [[{ "node": "Needs analysis?", "type": "main", "index": 0 }]]
+    },
+    "Needs analysis?": {
+      "main": [
+        [
+          { "node": "DeepSeek analysis", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "OK branch", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "DeepSeek analysis": {
+      "main": [[{ "node": "Parse AI JSON", "type": "main", "index": 0 }]]
+    },
+    "Parse AI JSON": {
+      "main": [[{ "node": "Format alert", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    { "name": "hackathon" }
+  ]
+}

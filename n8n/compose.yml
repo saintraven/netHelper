@@ -1,0 +1,32 @@
+# Фрагмент для общего docker-compose Ильи (сервис добавляется в infra/).
+services:
+  n8n:
+    image: docker.io/n8nio/n8n:1.70.1
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=Europe/Moscow
+      - TZ=Europe/Moscow
+      - PROMETHEUS_URL=${PROMETHEUS_URL:-http://prometheus:9090}
+      - TARGET_ID=${TARGET_ID:-edge-router-01}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-flash}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+volumes:
+  n8n_data:
+
+networks:
+  monitoring:
+    external: false
